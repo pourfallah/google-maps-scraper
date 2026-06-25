@@ -197,30 +197,73 @@
         if (!query) return;
         log(`🔎 جستجو: "${query}"`);
         
-        const searchBox = document.querySelector('#searchboxinput');
+        // Try multiple selectors for the search box (new Google Maps UI uses id="ucc-1" or name="q")
+        const searchBoxSelectors = [
+            '#ucc-1',
+            'input[name="q"]',
+            'input[role="combobox"][aria-controls]',
+            '#searchboxinput',
+            'input[autocomplete="off"][autofocus]',
+            '.UGojuc',
+            'input.fontBodyMedium'
+        ];
+        
+        let searchBox = null;
+        for (const sel of searchBoxSelectors) {
+            searchBox = document.querySelector(sel);
+            if (searchBox) {
+                log(`🎯 جعبه جستجو پیدا شد با: ${sel}`);
+                break;
+            }
+        }
+        
         if (!searchBox) {
             log('❌ جعبه جستجو پیدا نشد');
             return;
         }
         
-        searchBox.value = '';
+        // Focus and clear the search box
         searchBox.focus();
+        searchBox.value = '';
+        searchBox.dispatchEvent(new Event('input', { bubbles: true }));
         await sleep(300);
         
+        // Type the query character by character to trigger suggestions
         for (let i = 0; i < query.length; i++) {
-            searchBox.value = query.substring(0, i + 1);
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            nativeInputValueSetter.call(searchBox, query.substring(0, i + 1));
             searchBox.dispatchEvent(new Event('input', { bubbles: true }));
+            searchBox.dispatchEvent(new Event('change', { bubbles: true }));
             await sleep(50 + Math.random() * 100);
         }
         
         await sleep(1200 + Math.random() * 800);
         
-        const searchButton = document.querySelector('#searchbox-searchbutton, .mL3xi[aria-label="Search"], button[aria-label="Search"]');
+        // Try to find and click the search button
+        const searchButtonSelectors = [
+            '.mL3xi[aria-label="Search"]',
+            'button[aria-label="Search"]',
+            '#searchbox-searchbutton',
+            '.mL3xi',
+            'button[jsaction*="omnibox.search"]',
+            'span.google-symbols[aria-hidden="true"]'
+        ];
+        
+        let searchButton = null;
+        for (const sel of searchButtonSelectors) {
+            searchButton = document.querySelector(sel);
+            if (searchButton) {
+                log(`🎯 دکمه جستجو پیدا شد با: ${sel}`);
+                break;
+            }
+        }
+        
         if (searchButton) {
             log('🔍 کلیک روی دکمه جستجو');
             searchButton.click();
         } else {
-            log('⌨️ شبیه‌سازی Enter');
+            log('⌨️ شبیه‌سازی Enter در جعبه جستجو');
+            // Try pressing Enter on the search box
             const enterEvent = new KeyboardEvent('keydown', {
                 key: 'Enter',
                 code: 'Enter',
@@ -230,6 +273,13 @@
                 cancelable: true
             });
             searchBox.dispatchEvent(enterEvent);
+            
+            // Also try submitting the form
+            const form = searchBox.closest('form');
+            if (form) {
+                log('📝 ارسال فرم جستجو');
+                form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            }
         }
         
         await sleep(5000 + jitter());
